@@ -94,13 +94,34 @@ func (c *clientHandler) handlePWD() error {
 }
 
 func (c *clientHandler) handleLIST() error {
-	if files, err := c.driver.ListFiles(c); err == nil {
-		if tr, err2 := c.TransferOpen(); err2 == nil {
+	if files, err := c.driver.ListFiles(c, c.absPath(c.param)); err == nil {
+		if tr, errTr := c.TransferOpen(); errTr == nil {
 			defer c.TransferClose()
 			return c.dirTransferLIST(tr, files)
 		}
 	} else {
 		c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Could not list: %v", err))
+	}
+
+	return nil
+}
+
+func (c *clientHandler) handleNLST() error {
+	if files, err := c.driver.ListFiles(c, c.absPath(c.param)); err == nil {
+		if tr, errTrOpen := c.TransferOpen(); errTrOpen == nil {
+			defer c.TransferClose()
+			return c.dirTransferNLST(tr, files)
+		}
+	} else {
+		c.writeMessage(500, fmt.Sprintf("Could not list: %v", err))
+	}
+
+	return nil
+}
+
+func (c *clientHandler) dirTransferNLST(w io.Writer, files []os.FileInfo) error {
+	for _, file := range files {
+		fmt.Fprintf(w, "%s\r\n", file.Name())
 	}
 
 	return nil
@@ -112,8 +133,8 @@ func (c *clientHandler) handleMLSD() error {
 		return nil
 	}
 
-	if files, err := c.driver.ListFiles(c); err == nil {
-		if tr, err2 := c.TransferOpen(); err2 == nil {
+	if files, err := c.driver.ListFiles(c, c.absPath(c.param)); err == nil {
+		if tr, errTr := c.TransferOpen(); errTr == nil {
 			defer c.TransferClose()
 			return c.dirTransferMLSD(tr, files)
 		}

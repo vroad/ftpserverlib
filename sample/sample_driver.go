@@ -259,8 +259,8 @@ func (driver *ClientDriver) MakeDirectory(cc server.ClientContext, directory str
 }
 
 // ListFiles lists the files of a directory
-func (driver *ClientDriver) ListFiles(cc server.ClientContext) ([]os.FileInfo, error) {
-	if cc.Path() == DirVirtual {
+func (driver *ClientDriver) ListFiles(cc server.ClientContext, directory string) ([]os.FileInfo, error) {
+	if directory == DirVirtual {
 		files := make([]os.FileInfo, 0)
 		files = append(files,
 			virtualFileInfo{
@@ -276,16 +276,14 @@ func (driver *ClientDriver) ListFiles(cc server.ClientContext) ([]os.FileInfo, e
 		)
 
 		return files, nil
-	} else if cc.Path() == DirDebug {
+	} else if directory == DirDebug {
 		return make([]os.FileInfo, 0), nil
 	}
 
-	path := driver.BaseDir + cc.Path()
-
-	files, err := ioutil.ReadDir(path)
+	files, err := ioutil.ReadDir(directory)
 
 	// We add a virtual dir
-	if cc.Path() == "/" && err == nil {
+	if directory == "/" && err == nil {
 		files = append(files, virtualFileInfo{
 			name: "virtual",
 			mode: os.FileMode(0666) | os.ModeDir,
@@ -298,8 +296,12 @@ func (driver *ClientDriver) ListFiles(cc server.ClientContext) ([]os.FileInfo, e
 
 // OpenFile opens a file in 3 possible modes: read, write, appending write (use appropriate flags)
 func (driver *ClientDriver) OpenFile(cc server.ClientContext, path string, flag int) (server.FileStream, error) {
-	if path == DirVirtual+"/localpath.txt" {
-		return &virtualFile{content: []byte(driver.BaseDir)}, nil
+	if strings.HasPrefix(path, DirVirtual) {
+		if path == DirVirtual+"/localpath.txt" {
+			return &virtualFile{content: []byte(driver.BaseDir)}, nil
+		}
+
+		return nil, fmt.Errorf("this is a virtual directory, only reading of localpath.txt has been implemented")
 	}
 
 	path = driver.BaseDir + path
