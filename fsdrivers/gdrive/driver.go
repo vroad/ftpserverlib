@@ -11,7 +11,6 @@ package gdrive
 
 import (
 	"errors"
-	// "log"
 	"fmt"
 	"io"
 	"net/http"
@@ -36,7 +35,7 @@ type Driver struct {
 }
 
 // NewGDriveDrv creates a new isntance of the driver
-func NewGDriveDrv(srv *drive.Service, logger log.Logger) *Driver {
+func NewGDriveDrv(srv *drive.Service, logger log.Logger) server.ClientHandlingDriver {
 	drv := &Driver{
 		srv:        srv,
 		fileByName: make(map[string]*VirtualFileInfo),
@@ -211,17 +210,17 @@ func (drv *Driver) pathToFileInfo(filePath string) *VirtualFileInfo {
 }
 
 // ListFiles lists the files of a directory
-func (drv *Driver) ListFiles(cc server.ClientContext) ([]os.FileInfo, error) {
+func (drv *Driver) ListFiles(cc server.ClientContext, path string) ([]os.FileInfo, error) {
 	drv.logger.Info(
 		"msg", "GDrive: Listing files",
 		"action", "gdrive.ListFiles",
-		"path", cc.Path(),
+		"path", path,
 	)
 
-	info := drv.pathToFileInfo(cc.Path())
+	info := drv.pathToFileInfo(path)
 
 	if info == nil {
-		return nil, fmt.Errorf("couldn't identify a fileId for path=%s", cc.Path())
+		return nil, fmt.Errorf("couldn't identify a fileId for path=%s", path)
 	}
 
 	list, err := drv.listGdriveFiles(info.file.Id)
@@ -241,7 +240,15 @@ func (drv *Driver) ListFiles(cc server.ClientContext) ([]os.FileInfo, error) {
 
 		path := getPath(cc, i.Name)
 
-		drv.logger.Info("FILE", "path", path, "name", i.Name, "id", i.Id, "modifiedTime", i.ModifiedTime, "mimeType", i.MimeType)
+		drv.logger.Debug(
+			"msg", "File listing",
+			"action", "gdrive.ListFiles.fileEntry",
+			"path", path,
+			"name", i.Name,
+			"id", i.Id,
+			"modifiedTime", i.ModifiedTime,
+			"mimeType", i.MimeType,
+		)
 
 		v := &VirtualFileInfo{file: i}
 		drv.fileByName[path] = v
@@ -375,8 +382,8 @@ func (drv *Driver) DeleteFile(cc server.ClientContext, path string) error {
 	if fileInfo != nil {
 		_, err := drv.srv.Files.Update(fileInfo.file.Id, &drive.File{Trashed: true}).Do()
 		drv.fileByNameMutex.Lock()
+		defer drv.fileByNameMutex.Unlock()
 		delete(drv.fileByName, path)
-		drv.fileByNameMutex.Unlock()
 		return err
 		//return drv.srv.Files.Delete(fileInfo.file.Id).Do()
 	} else {
