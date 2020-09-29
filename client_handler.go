@@ -179,10 +179,6 @@ func (c *clientHandler) HandleCommands() {
 			return
 		}
 
-		if c.debug {
-			c.logger.Debug("Received line", "line", line)
-		}
-
 		c.handleCommand(line)
 	}
 }
@@ -228,6 +224,11 @@ func (c *clientHandler) handleCommandsStreamError(err error) {
 // handleCommand takes care of executing the received line
 func (c *clientHandler) handleCommand(line string) {
 	command, param := parseLine(line)
+
+	if c.debug {
+		c.logger.Debug("Received line", "line", maskSensitiveLine(command, line))
+	}
+
 	c.command = strings.ToUpper(command)
 	c.param = param
 
@@ -387,4 +388,12 @@ func getMessageLines(message string) []string {
 	}
 
 	return lines
+}
+
+func maskSensitiveLine(command string, line string) string {
+	if command == "PASS" {
+		return command + " <sensitive>"
+	}
+
+	return line
 }
